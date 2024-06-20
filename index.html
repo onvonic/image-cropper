@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Image Cropper</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <!-- Cropper.js CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <input id="files-input" type="file">
+    <hr>
+    <div style="height: 250px">
+        <img id="files-image" alt="Image for cropping" src="img/empty-img.jpg">
+    </div>
+    <hr>
+    <button id="cropButton">Crop</button>
+    <div>
+        <img id="preview_img" style="height: 250px"><br>
+        <input id="descption_image" type="text" placeholder="descption image ...">
+        <input id="preview_dimensions" type="text" placeholder="dimensions image ...">
+        <button id="send_to_api">Upload</button>
+    </div>
+    <!-- Cropper.js JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
+    <!-- Axios JS -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Set Default setRatio = 1 for 1:1, 
+            // Set Default setRatio = 2/3 for 2:3, 4:6
+            // Set Default setRatio = null for free
+            const setRatio = 1;
+            let image = document.getElementById('files-image');
+            let input = document.getElementById('files-input');
+            let cropper;
+
+            input.addEventListener('change', function (e) {
+                let files = e.target.files;
+                let done = function (url) {
+                    input.value = '';
+                    image.src = url;
+                    if (cropper) {
+                        cropper.destroy();
+                    }
+                    cropper = new Cropper(image, {
+                        aspectRatio: setRatio,
+                        viewMode: 1
+                    });
+                };
+
+                let reader;
+                let file;
+
+                if (files && files.length > 0) {
+                    file = files[0];
+                    if (URL) {
+                        done(URL.createObjectURL(file));
+                    } else if (FileReader) {
+                        reader = new FileReader();
+                        reader.onload = function (e) {
+                            done(reader.result);
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                }
+            });
+            // Handle crop
+            document.getElementById('cropButton').addEventListener('click', function () {
+                if (cropper) {
+                    // Get cropped canvas
+                    let canvas = cropper.getCroppedCanvas();
+                    if (canvas) {
+                        // Display cropped image in preview
+                        document.getElementById('preview_img').src = canvas.toDataURL();
+                        // Calculate and display the aspect ratio
+                        let aspectRatio = canvas.width / canvas.height;
+                        document.getElementById('preview_dimensions').value =
+                            `${canvas.width} * ${canvas.height} px`;
+                    } else {
+                        console.error('Failed to get cropped canvas');
+                    }
+                }
+            });
+            // Handle upload
+            document.getElementById('send_to_api').addEventListener('click', function () {
+                if (cropper) {
+                    // Get cropped canvas
+                    let canvas = cropper.getCroppedCanvas();
+                    if (canvas) {
+                        // Convert canvas to Blob
+                        canvas.toBlob(function (blob) {
+
+                            let formData = new FormData();
+                            let description = document.getElementById('descption_image').value;
+                            let previewDimensions = document.getElementById(
+                                'preview_dimensions').value;
+                            let file = new File([blob], 'image.' + blob.type.split('/')[1]);
+
+                            formData.append('files', file);
+                            formData.append('description', description);
+                            formData.append('previewDimensions', previewDimensions);
+
+                            // Send to API using Axios
+                            axios.post(`{{ route('url_endpoint_api') }}`, formData, {
+                                headers: {
+                                    'Content-Type': 'multipart/form-data'
+                                }
+                            }).then(function (response) {
+                                console.log('Upload success:', response.data);
+                            }).catch(function (error) {
+                                console.error('Upload error:', error);
+                            });
+                        });
+                    } else {
+                        console.error('Failed to get cropped canvas');
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>
